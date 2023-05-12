@@ -6,6 +6,8 @@ using std::cout;
 using std::endl;
 using std::string;
 
+enum ExternalData { OUTSIDE_TEMPERATURE, INSIDE_TEMPERATURE, MOTION_DETECTION, MAX_ITEMS };
+
 enum DeviceStatus {
     MAIN = 1,
     INSIDE_LIGHT = 2,
@@ -84,37 +86,8 @@ string getUserChoice(size_t const devicesCount) {
     return userInput;
 }
 
-void printReport(
-        int hour,
-        int outsideTemperature,
-        int insideTemperature,
-        int isMotionDetection,
-        const unsigned int* deviceState,
-        const string* deviceNames,
-        const size_t switchCount) {
-    cout << "-----------" << hour << "--------------------\n";
-    cout << "Data outside: \n";
-    printf("Outside temperature: %14i\n", outsideTemperature);
-    printf("Inside temperature:  %14i\n", insideTemperature);
-    printf("Is motion detection: %14i\n", isMotionDetection);
-    cout << "-------------------------------\nCurrent switches status: \n";
-    for (int i = 0; i < switchCount; ++i) {
-        printf("(%i) status of %-*s: %s\n",
-               i,
-               16, deviceNames[i].c_str(),
-               deviceState[i] ? "ON " : "OFF");
-    }
-    cout << "-------------------------------\n";
-}
-
-int main() {
-    const int DEVICES_COUNT = 7;
-
-    int outsideTemperature;
-    int insideTemperature;
-    bool isMotionDetection = false;
-
-    string deviceNames[DEVICES_COUNT] = {
+void printDeviceStatus (const unsigned int &store, size_t DEVICES_COUNT) {
+    string deviceNames[] = {
             "all",
             "inside light",
             "outside light",
@@ -124,15 +97,42 @@ int main() {
             "garden lighting"
     };
 
-    unsigned int deviceState[DEVICES_COUNT] = {0};
+    for (int currentDevice = 0; currentDevice < DEVICES_COUNT; ++currentDevice) {
+        printf("(%i) status of %-*s: %s\n",
+               currentDevice,
+               16, deviceNames[currentDevice].c_str(),
+               bool(store & (1 << currentDevice)) ? "ON " : "OFF");
+    }
+}
+
+void printReportForHour(int hour, const unsigned int* externalDataStates, const unsigned int &switchesState, const size_t DEVICES_COUNT) {
+
+    string externalDataNames[] = { "Outside temperature", "Inside temperature ", "Is motion detection" };
+
+    cout << "-----------" << hour << "--------------------\n";
+    cout << "Data outside: \n";
+    for (int i = 0; i < ExternalData::MAX_ITEMS; ++i) {
+        printf("%s: %14i\n", externalDataNames[i].c_str(), externalDataStates[i]);
+    }
+
+    cout << "-------------------------------\nCurrent switches status: \n";
+    printDeviceStatus(switchesState, DEVICES_COUNT);
+    cout << "-------------------------------\n";
+}
+
+int main() {
+    const int DEVICES_COUNT = 7;
+    unsigned int externalDataStates[ExternalData::MAX_ITEMS] = {0};
+    unsigned int switchesState{0};
     string userChoice;
 
     //------hour 00:00
-    outsideTemperature = 12;
-    insideTemperature = 23;
-    isMotionDetection = false;
 
-    printReport(0, outsideTemperature, insideTemperature, isMotionDetection, deviceState, deviceNames, DEVICES_COUNT);
+    externalDataStates[ExternalData::OUTSIDE_TEMPERATURE] = 12;
+    externalDataStates[ExternalData::INSIDE_TEMPERATURE] = 23;
+    externalDataStates[ExternalData::MOTION_DETECTION] = 0;
+
+    printReportForHour(0, externalDataStates, switchesState, DEVICES_COUNT);
 
     cout << "Do you want to enable/disable devices?\n";
     cout << "Enter 'Y' to on/off devices or 'N' to skip until next hour: ";
