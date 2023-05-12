@@ -43,19 +43,217 @@
 Информация о движении выводится в формате yes/no.
 Включение и отключение света происходит с помощью on/off.
 
-### Рекомендации
+### Решение:
 
-Состояние переключателей можно хранить в перечислении вида:
+В доме есть щиток с переключателями:
+
+* тумблер отключения/включения питания всего дома: `MAIN`.
+  Все остальные тумблеры работают лишь если главный тумблер: `MAIN: on`
+* тумблер отключения/включения внутреннего света: `INSIDE_LIGHT`
+* тумблер отключения/включения внешнего света: `OUTSIDE_LIGHT`
+* тумблер включения/отключения водопровода, идущего из скважины с насосом: `PLUMBING`. Automatic
+  Если температура на улице (`outsideTemperature`) падает ниже 0, `PLUMBING: on` 
+  Если температура на улице поднимается выше 5, `PLUMBING: off`
+* тумблер включения/отключения внутренней температуры: `HEATING`.
+  Если температура в доме (`insideTemperature`) упала ниже 22 градусов, `HEATING: on`,
+  Если температура в доме поднялась выше 25 градусов, `HEATING: off`
+* тумблер включения/отключения кондиционера: `CONDITIONER`.
+  Если температура в доме (`insideTemperature`) повысилась выше 30 градусов, `CONDITIONER: off`,
+  Если температура в доме достигает 25 градусов, `CONDITIONER: on`
+* тумблер включения/отключения внешнего освещения: `GARDEN_LIGHTING`. 
+  Днем в состоянии `GARDEN_LIGHTING: off`. 
+  В ночное время (между 16:00 и 5:00), если есть движение (`isMotionDetection`), `GARDEN_LIGHTING: on`
+* В интервале с 00:00 до 16:00 температура света (`brightness`) равна 5000, 
+  в интервале с 16:00 до 20:00 температура света плавно понижается до 2700,
+  в интервале с 20:00 до 00:00 температура равна 2700. 
+  Конечно, свет есть лишь тогда, когда он включен: `INSIDE_LIGHT: on`
+
+
+| type   | automatic | toggles         | MAIN | insideTemperature            | outsideTemperature       | INSIDE_LIGHT | OUTSIDE_LIGHT | isMotionDetection | time              |
+|--------|-----------|-----------------|------|------------------------------|--------------------------|--------------|---------------|-------------------|-------------------|
+| switch |           | MAIN            | on   |                              |                          |              |               |                   |                   |
+| switch |           | INSIDE_LIGHT    | on   |                              |                          |              |               |                   |                   |
+| switch |           | OUTSIDE_LIGHT   | on   |                              |                          |              |               |                   |                   |
+| switch | automatic | PLUMBING        | on   |                              | on if (x > 0) && (x < 5) |              |               |                   |                   |
+| switch | automatic | HEATING         | on   | x < 22 && (off if x >= 25)   |                          |              |               |                   |                   |
+| switch | automatic | CONDITIONER     | on   | (x > 30) && (off if x <= 25) |                          |              |               |                   |                   |
+| switch | automatic | GARDEN_LIGHTING |      |                              |                          |              | on            | is                | x >= 16 && x <= 5 |
+| range  | automatic | brightness      |      |                              |                          | on           |               |                   | range             |
+
+Каждый час пользователь сообщает (Данные параметры вводятся разом в одну строку через пробел, а потом парсятся в переменные из строкового буфера stringstream):
+
+* температура внутри (`insideTemperature`), 
+* температура снаружи (`outsideTemperature`), 
+* есть ли движение снаружи (`isMotionDetection`), 
+
+Если произошла смена состояния, это отображается на табло.
+
+Если свет включен (`INSIDE_LIGHT`), должна отображаться температура света (`brightness`)
+
+
+## Битовые операции
+
+В самом простом случае не понадобится даже перечисление Switches. Оно лишь для наглядности.
+
+В select заносим произвольное число (не более количества в Switches. В данном случае - не более 5);
+
+Массив switchStates лучше делать с типом unsigned int.
+
+Создаем `flag`, который понадобится для битовых операций. Можно в него заносить данные из Switches. 
+Например, сейчас мы в select занесли 3. Соответственно, из Switches нужно взять третий элемент. 
+Это будет `Switches::PLUMBING`. 
+Однако, поскольку соотносить каждый раз введенное в select число и номер из перечисления достаточно трудоёмко
+(хотя можно это сделать через switch case), проще воспользоваться аналогом: `1 << select`. 
+
+Сдвиг влево на n, по сути, аналогичен умножению числа на 2n. Например, `7 << 3` даст в итоге `7 * 2*2*2 = 56`. 
+Но в данном коде важнее то, что `Switches::PLUMBING` и `(1 << select)` дают одинаковый результат. 
+
+Иначе говоря: 
+
+| [n] | enum                      | идентично | биты |
+|:---:|---------------------------|:---------:|-----:|
+|  0  | Switches::MAIN            |  1 << 0   |    1 |
+|  1  | Switches::INSIDE_LIGHT    |  1 << 1   |    2 |
+|  2  | Switches::OUTSIDE_LIGHT   |  1 << 2   |    4 |
+|  3  | Switches::PLUMBING        |  1 << 3   |    8 |
+|  4  | Switches::HEATING         |  1 << 4   |   16 |
+|  5  | Switches::CONDITIONER     |  1 << 5   |   32 |
+|  6  | Switches::GARDEN_LIGHTING |  1 << 6   |   64 |
+
+
+и т.д., где изменяющаяся часть 0, 1, 2 соответствуют позиции в перечислении.
+
+Это позволяет манипулировать битом, устанавливая или снимая флаг (который, как мы установили ранее, равен 1 << select).
+
+Поскольку перечисление можно заменить конструкцией `1 << N` результат разумно будет поместить в переменную типа
+unsigned int. В таком случае пусть у нас будет два числа типа X и N: в X будет целевым числом, в котором будем менять биты. 
+А N это будет смещение битов. 
+
+Помним, что номера битов отсчитываются справа налево, начиная с нуля.
+0 — это младший бит (справа), 7 — это старший  бит (слева). 
+Тогда, если мы хотим поменять несколько битов, то сделать это можно как:
 
 ```C++
-enum switches {
-    LIGHTS_INSIDE = 1,
-    LIGHTS_OUTSIDE = 2,
-    HEATERS = 4,
-    WATER_PIPE_HEATING = 8,
-    CONDITIONER = 16
-};
+X = 1 << N0 | 1 << N2 | 1 << N3;
 ```
 
-Чтобы включить обогреватель, нужно написать switches_state |= HEATERS; 
-Чтобы выключить — switches_state &= ~HEATERS;
+Перечислю основные операции:
+
+|                          |                               |
+|--------------------------|-------------------------------|
+| `X \|= (1 << N)`         | поставить флаг                |
+| `X &= ~(1 << N)`         | убрать флаг                   |
+| `X ^= (1 << N)`          | инвертировать флаг            |
+| `bool(store & (1 << N))` | проверить существование флага |
+
+Данные операции можно комбинировать. 
+Например, интересным аналогом `x ^= (1 << int)` может стать конструкция
+
+```C++
+x = bool(x & (1 << ch)) ? (x &= ~flag) : (x |= flag);
+```
+Для примера - следующая программа с объяснениями:
+
+```C++
+#include <iostream>
+using std::cout; using std::endl; using std::string;
+
+int main() {
+    unsigned int ch{0};
+    unsigned int flag{0};
+    unsigned int store{0};
+
+    // во второй (!) бит добавим флаг
+    ch = ('1' - '0');
+    flag = (1 << ch);
+    store |= flag;
+
+    // во втором бите снимем флаг
+    ch = ('1' - '0');
+    flag = (1 << ch);
+    store &= ~flag;
+
+    // в третьем бите добавим флаг, если в нем пока нет флага
+    ch = ('2' - '0');
+    flag = (1 << ch);
+    store = bool(store & (1 << ch)) ? (store &= ~flag) : (store |= flag);
+
+    // в четвертом бите также инвертируем флаг
+    ch = ('3' - '0');
+    flag = (1 << ch);
+    store ^= flag;
+
+    cout << (store & (1 << 0)) << endl; // 0
+    cout << (store & (1 << 1)) << endl; // 0
+    cout << (store & (1 << 2)) << endl; // 4
+    cout << (store & (1 << 3)) << endl; // 8
+    cout << "-------------------" << endl;
+
+    string userInputString = "245";
+    for (char c : userInputString) {
+        unsigned int cha = (c - '0');
+        // инвертируем попавшиеся биты
+        flag = (1 << cha);
+        store ^= flag;
+    }
+
+    cout << (store & (1 << 0)) << endl; // 0
+    cout << (store & (1 << 1)) << endl; // 0
+    cout << (store & (1 << 2)) << endl; // 0
+    cout << (store & (1 << 3)) << endl; // 8
+    cout << (store & (1 << 4)) << endl; // 16
+    cout << (store & (1 << 5)) << endl; // 32
+    cout << (store & (1 << 6)) << endl; // 0
+}
+```
+
+Можно сделать интересный трюк, инвертируя все входящие номера битов. И, при этом, воспользоваться перечислением. 
+Просто для наглядности:
+
+```C++
+#include <iostream>
+using std::cout; using std::endl; using std::string; using std::vector;
+
+enum class Switches {
+    MAIN = 1,
+    INSIDE_LIGHT = 2,
+    OUTSIDE_LIGHT = 4,
+    PLUMBING = 8,
+    HEATING = 16,
+    CONDITIONER = 32,
+    GARDEN_LIGHTING = 64,
+};
+
+unsigned int getFlag (char c) {
+    // Можно использовать и более простой вариант:
+    // unsigned int cha = (c - '0');
+    // unsigned int flag = (1 << cha);
+    // return flag;
+    
+    switch (c) {
+        case ('0'): return static_cast<unsigned int>(Switches::MAIN);
+        case ('1'): return static_cast<unsigned int>(Switches::INSIDE_LIGHT);
+        case ('2'): return static_cast<unsigned int>(Switches::OUTSIDE_LIGHT);
+        case ('3'): return static_cast<unsigned int>(Switches::PLUMBING);
+        case ('4'): return static_cast<unsigned int>(Switches::HEATING);
+        case ('5'): return static_cast<unsigned int>(Switches::CONDITIONER);
+        case ('6'): return static_cast<unsigned int>(Switches::GARDEN_LIGHTING);
+        default: return static_cast<unsigned int>(Switches::MAIN);
+    }
+}
+
+int main() {
+    string userInputString = "245";
+    for (char c : userInputString) {
+        unsigned int store ^= getFlag(c);
+    }
+}
+```
+
+### Интересные ссылки:
+
+[Поразрядные операции](https://metanit.com/cpp/tutorial/2.8.php)
+
+[Битовые флаги как аргументы функций](https://itnotesblog.ru/note/bitovye-flagi-kak-argumenty-funkcij-na-c/cpp)
+
+[C/C++ Работа с битами](https://volstr.ru/?p=36)
