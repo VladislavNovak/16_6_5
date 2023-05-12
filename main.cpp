@@ -56,7 +56,7 @@ string getUserInput(const string &range, bool isRepeatAllowed = false, size_t ma
     constraints.append(1, INPUT_ENDING);
 
     // to format: zu - size_t, s - string.c_str, c - char
-    printf("Enter up characters in the range: %s\n", constraints.c_str());
+    printf("Enter one or more%s characters in the range: %s\n", (isRepeatAllowed ? "" : " unique"), constraints.c_str());
     printf("To complete, enter %zu characters or press the key '%c': ", maxCount, INPUT_ENDING);
     while(curCount < maxCount) {
         char ch = getUserChar<char>(constraints);
@@ -76,7 +76,7 @@ string getUserInput(const string &range, bool isRepeatAllowed = false, size_t ma
 string getUserChoice(size_t const devicesCount) {
     string constraint;
     // Набираем лишь символы от 0 до devicesCount
-    for (int i = 0; i < devicesCount; ++i) constraint += (i + '0');
+    for (int i = 0; i < devicesCount; ++i) constraint += static_cast<char>(i + '0');
 
     string userInput = getUserInput(constraint, false, devicesCount);
     std::sort(userInput.begin(), userInput.end());
