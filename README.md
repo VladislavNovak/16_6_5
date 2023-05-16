@@ -257,3 +257,12 @@ int main() {
 [Битовые флаги как аргументы функций](https://itnotesblog.ru/note/bitovye-flagi-kak-argumenty-funkcij-na-c/cpp)
 
 [C/C++ Работа с битами](https://volstr.ru/?p=36)
+
+### LIB. Использованные функции
+
+| Функция      | Ver | return | Смысл                                                       |
+|--------------|-----|--------|-------------------------------------------------------------|
+| isIncludes   | 1.0 | bool   | Получаем true если элемент хоть раз встречается в диапазоне |
+| getUserChar  | 1.0 | T      | Получаем символ в обозначенном диапазоне                    |
+| getUserInput | 1.0 | string | Получаем слово на основе getUserChar                        |
+| enumToString | 1.0 | string | Преобразовываем enum в соответствующий string               |
