@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cctype>
 #include <vector>
+#include <cstdlib> // rand, srand
+#include <ctime> // time
 
 using std::cout;
 using std::endl;
@@ -26,7 +28,6 @@ enum class Switches {
     STORAGE_SIZE = 7
 };
 
-// LIB
 // Получаем true если элемент `item` хоть раз встречается в диапазоне `range`
 bool isIncludes(const string &range, const char &item) {
     return std::any_of(range.begin(),
@@ -47,7 +48,6 @@ std::string getJoinRange (const std::string &range) {
     return joinRange;
 }
 
-// LIB
 // Получаем char-символ в обозначенном диапазоне `range`
 template<typename T>
 T getUserChar(string const &range) {
@@ -67,13 +67,11 @@ T getUserChar(string const &range) {
     return input;
 }
 
-// SNIPPET
 bool getUserYesNo (const std::string &proposition) {
     printf("%s Press 'Y' to agree or 'N' to skip: ", proposition.c_str());
     return isIncludes("Yy", getUserChar<char>("YynNn"));
 }
 
-// LIB
 // Получаем слово с параметрами:
 //  - в указанном диапазоне `range`
 //  - разрешено ли повторное введение символов. По умолчанию - не разрешено
@@ -104,7 +102,6 @@ string getUserInput(const string &range, bool isRepeatAllowed = false, size_t ma
     return userInput;
 }
 
-// SNIPPET
 // Возвращает пользовательское слово с отсортированными уникальными символами, указанными в диапазоне range
 string getUserChoiceFrom(const std::string &range) {
     string userInput = getUserInput(range, false, range.size());
@@ -113,7 +110,6 @@ string getUserChoiceFrom(const std::string &range) {
     return userInput;
 }
 
-// LIB
 // Меняет в переменной типа unsigned int указанный в changeItem бит
 void changeStorageStatus (char item, OpType operation, unsigned int &store) {
     assert(std::isdigit(item));
@@ -128,7 +124,6 @@ void changeStorageStatus (char item, OpType operation, unsigned int &store) {
     }
 }
 
-// LIB candidate
 bool getStorageItemStatus (char item, const unsigned int &switchStorage) {
     assert(std::isdigit(item));
     unsigned int cha = (item - '0');
@@ -136,7 +131,7 @@ bool getStorageItemStatus (char item, const unsigned int &switchStorage) {
     return bool(switchStorage & choice);
 }
 
-// SNIPPET вариант changeStorageStatus с использованием перечисления
+// вариант changeStorageStatus с использованием перечисления
 void changeSwitchStatus (char item, OpType operation, unsigned int &switchStorage) {
     assert(std::isdigit(item));
     Switches choice;
@@ -211,11 +206,15 @@ void gardenLightingController (unsigned int &switchStorage, const int* externalD
     }
 }
 
+int getRandomData (int from, int to) {
+    return (from + std::rand() % (to - from + 1)); // NOLINT(cert-msc50-cpp)
+}
+
 void setCurrentExternalData (int* externalData) {
     ++externalData[static_cast<int>(ExternalData::TIME)];
-    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = 12;
-    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = 18;
-    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = 0;
+    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = getRandomData(-10, 40);
+    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = getRandomData(-10, 40);
+    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = getRandomData(0, 1);
 }
 
 void printSwitchStorage (const unsigned int &switchStorage) {
@@ -275,6 +274,8 @@ int main() {
     int externalData[static_cast<int>(ExternalData::STORAGE_SIZE)] = {0};
     string userChoice;
 
+    srand(time(NULL));
+
     //------hour 00:00
 
     setCurrentExternalData(externalData);
@@ -302,5 +303,5 @@ int main() {
         gardenLightingController(storage, externalData);
     }
 
-    printSwitchStorage(storage);
+    printReport(storage, externalData);
 }
