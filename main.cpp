@@ -3,12 +3,14 @@
 #include <string>
 #include <cassert>
 #include <cctype>
+#include <vector>
 
 using std::cout;
 using std::endl;
 using std::string;
+using std::vector;
 
-enum class ExternalData { OUTSIDE_TEMPERATURE, INSIDE_TEMPERATURE, MOTION_DETECTION, TIME, STORAGE_SIZE };
+enum class ExternalData { TIME, OUTSIDE_TEMPERATURE, INSIDE_TEMPERATURE, MOTION_DETECTION, STORAGE_SIZE };
 
 // операции добавления/удаления/инверсии
 enum class OpType { ON, OFF, REVERSAL };
@@ -164,10 +166,6 @@ void autoReverseStorageStatus (unsigned int &switchStorage, std::string const &u
     }
 }
 
-void offAllStorageStatus (unsigned int &store) {
-
-}
-
 void plumbingController (unsigned int &switchStorage, const int* externalData) {
     const char PLUMBING = '3';
     const int outsideTemperature = externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)];
@@ -213,9 +211,16 @@ void gardenLightingController (unsigned int &switchStorage, const int* externalD
     }
 }
 
-void printSwitchStorageStatus (const unsigned int &switchStorage) {
-    const auto NUMBER_OF_SWITCHES = static_cast<size_t>(Switches::STORAGE_SIZE);
-    string switchNames[] = {
+void setCurrentExternalData (int* externalData) {
+    ++externalData[static_cast<int>(ExternalData::TIME)];
+    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = 12;
+    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = 18;
+    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = 0;
+}
+
+void printSwitchStorage (const unsigned int &switchStorage) {
+    const auto SIZE = static_cast<size_t>(Switches::STORAGE_SIZE);
+    vector<string> switchNames = {
             "all",
             "inside light",
             "outside light",
@@ -225,29 +230,41 @@ void printSwitchStorageStatus (const unsigned int &switchStorage) {
             "garden lighting"
     };
 
-    for (int currentSwitch = 0; currentSwitch < NUMBER_OF_SWITCHES; ++currentSwitch) {
+    assert(SIZE == switchNames.size());
+
+    cout << "------------------------------------\nSwitches status: \n";
+    for (int currentSwitch = 0; currentSwitch < SIZE; ++currentSwitch) {
+        // - выравнивание по левому краю, * даёт возможность указать длину поля
         printf("(%i) status of %-*s: %s\n",
                currentSwitch,
                16, switchNames[currentSwitch].c_str(),
-               bool(switchStorage & (1 << currentSwitch)) ? "ON " : "OFF");
+               getStorageItemStatus(static_cast<char>(currentSwitch + '0'), switchStorage) ? "ON " : "OFF");
     }
 }
 
-void printExternalDataStatus (const int* externalData) {
-    string externalDataNames[] = { "Outside temperature", "Inside temperature ", "Is motion detection", "time" };
+void printExternalData (const int* externalData) {
+    const auto SIZE = static_cast<size_t>(ExternalData::STORAGE_SIZE);
+    vector<string> externalDataNames = {
+            "Time",
+            "Outside temperature",
+            "Inside temperature ",
+            "Is motion detection"
+    };
 
-    cout << "Data outside: \n";
-    for (int i = 0; i < static_cast<int>(ExternalData::STORAGE_SIZE); ++i) {
-        printf("%s: %14i\n", externalDataNames[i].c_str(), externalData[i]);
+    assert(SIZE == externalDataNames.size());
+
+    cout << "------------------------------------\nData outside: \n";
+    for (int i = 0; i < SIZE; ++i) {
+        printf("%-*s: %i\n",
+               30, externalDataNames[i].c_str(),
+               externalData[i]);
     }
 }
 
-void printReportForHour(const unsigned int &switchStorage, const int* externalData) {
-    cout << "-----------" << externalData[static_cast<int>(ExternalData::TIME)] << "--------------------\n";
-    printExternalDataStatus(externalData);
-    cout << "-------------------------------\nCurrent switches status: \n";
-    printSwitchStorageStatus(switchStorage);
-    cout << "-------------------------------\n";
+void printReport(const unsigned int &switchStorage, const int* externalData) {
+    printExternalData(externalData);
+    printSwitchStorage(switchStorage);
+    cout << "------------------------------------\n";
 }
 
 int main() {
@@ -260,17 +277,14 @@ int main() {
 
     //------hour 00:00
 
-    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = 12;
-    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = 18;
-    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = 0;
-    externalData[static_cast<int>(ExternalData::TIME)] = 2;
+    setCurrentExternalData(externalData);
 
-    printReportForHour(storage, externalData);
+    printReport(storage, externalData);
 
     if (!getStorageItemStatus(MAIN_SWITCH, storage)) {
         if (getUserYesNo("Smart home is off. Turn it on?")) {
             changeSwitchStatus(MAIN_SWITCH, OpType::ON, storage);
-        };
+        }
     }
 
     if (getStorageItemStatus(MAIN_SWITCH, storage)) {
@@ -284,11 +298,9 @@ int main() {
         }
     }
 
-    bool isOutsideLightOn = getStorageItemStatus(OUTSIDE_LIGHT, storage);
     if (getStorageItemStatus(INSIDE_LIGHT, storage)) {
         gardenLightingController(storage, externalData);
     }
 
-    cout << "-------------------------------\nNew switches status: \n";
-    printSwitchStorageStatus(storage);
+    printSwitchStorage(storage);
 }
