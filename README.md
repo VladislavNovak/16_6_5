@@ -58,8 +58,8 @@
   Если температура в доме (`insideTemperature`) упала ниже 22 градусов, `HEATING: on`,
   Если температура в доме поднялась выше 25 градусов, `HEATING: off`
 * тумблер включения/отключения кондиционера: `CONDITIONER`.
-  Если температура в доме (`insideTemperature`) повысилась выше 30 градусов, `CONDITIONER: off`,
-  Если температура в доме достигает 25 градусов, `CONDITIONER: on`
+  Если температура в доме (`insideTemperature`) повысилась выше 30 градусов, `CONDITIONER: on`,
+  Если температура в доме достигает 25 градусов, `CONDITIONER: off`
 * тумблер включения/отключения внешнего освещения: `GARDEN_LIGHTING`. 
   Днем в состоянии `GARDEN_LIGHTING: off`. 
   В ночное время (между 16:00 и 5:00), если есть движение (`isMotionDetection`), `GARDEN_LIGHTING: on`
@@ -69,16 +69,16 @@
   Конечно, свет есть лишь тогда, когда он включен: `INSIDE_LIGHT: on`
 
 
-| type   | automatic | toggles         | MAIN | insideTemperature            | outsideTemperature       | INSIDE_LIGHT | OUTSIDE_LIGHT | isMotionDetection | time              |
-|--------|-----------|-----------------|------|------------------------------|--------------------------|--------------|---------------|-------------------|-------------------|
-| switch |           | MAIN            | on   |                              |                          |              |               |                   |                   |
-| switch |           | INSIDE_LIGHT    | on   |                              |                          |              |               |                   |                   |
-| switch |           | OUTSIDE_LIGHT   | on   |                              |                          |              |               |                   |                   |
-| switch | automatic | PLUMBING        | on   |                              | on if (x > 0) && (x < 5) |              |               |                   |                   |
-| switch | automatic | HEATING         | on   | x < 22 && (off if x >= 25)   |                          |              |               |                   |                   |
-| switch | automatic | CONDITIONER     | on   | (x > 30) && (off if x <= 25) |                          |              |               |                   |                   |
-| switch | automatic | GARDEN_LIGHTING |      |                              |                          |              | on            | is                | x >= 16 && x <= 5 |
-| range  | automatic | brightness      |      |                              |                          | on           |               |                   | range             |
+| type   | automatic | toggles         | MAIN | insideTemperature            | outsideTemperature              | INSIDE_LIGHT | OUTSIDE_LIGHT | isMotionDetection | time              |
+|--------|-----------|-----------------|------|------------------------------|---------------------------------|--------------|---------------|-------------------|-------------------|
+| switch |           | MAIN            | on   |                              |                                 |              |               |                   |                   |
+| switch |           | INSIDE_LIGHT    | on   |                              |                                 |              |               |                   |                   |
+| switch |           | OUTSIDE_LIGHT   | on   |                              |                                 |              |               |                   |                   |
+| switch | automatic | PLUMBING        | on   |                              | on if (x < 0) && off if (x > 5) |              |               |                   |                   |
+| switch | automatic | HEATING         | on   | x < 22 && (off if x >= 25)   |                                 |              |               |                   |                   |
+| switch | automatic | CONDITIONER     | on   | (x > 30) && (off if x <= 25) |                                 |              |               |                   |                   |
+| switch | automatic | GARDEN_LIGHTING |      |                              |                                 |              | on            | is                | x >= 16 && x <= 5 |
+| range  | automatic | brightness      |      |                              |                                 | on           |               |                   | range             |
 
 Каждый час пользователь сообщает (Данные параметры вводятся разом в одну строку через пробел, а потом парсятся в переменные из строкового буфера stringstream):
 
