@@ -28,6 +28,16 @@ enum class Switches {
     STORAGE_SIZE = 7
 };
 
+vector<string> switchNames = {
+        "all",
+        "inside light",
+        "outside light",
+        "plumbing",
+        "heating",
+        "conditioner",
+        "garden lighting"
+};
+
 // Получаем true если элемент `item` хоть раз встречается в диапазоне `range`
 bool isIncludes(const string &range, const char &item) {
     return std::any_of(range.begin(),
@@ -114,7 +124,6 @@ string getUserChoiceFrom(const std::string &range) {
 void changeStorageStatus (char item, OpType operation, unsigned int &store) {
     assert(std::isdigit(item));
     unsigned int cha = (item - '0');
-    // assert(cha < storageSize);
     unsigned int choice = (1 << cha);
 
     switch (operation) {
@@ -129,6 +138,13 @@ bool getStorageItemStatus (char item, const unsigned int &switchStorage) {
     unsigned int cha = (item - '0');
     unsigned int choice = (1 << cha);
     return bool(switchStorage & choice);
+}
+
+string getStorageItemInfo (char item, unsigned int &switchStorage) {
+    unsigned int cha = (item - '0');
+    string switchInfo = switchNames[cha];
+    switchInfo += getStorageItemStatus(item, switchStorage) ? ": ON" : ": OFF";
+    return switchInfo;
 }
 
 // вариант changeStorageStatus с использованием перечисления
@@ -155,55 +171,75 @@ void changeSwitchStatus (char item, OpType operation, unsigned int &switchStorag
 }
 
 // Меняет в store указанные в userInputString позиции на противоположные
-void autoReverseStorageStatus (unsigned int &switchStorage, std::string const &userInputString) {
-    for (char c : userInputString) {
+void autoReverseStorageStatus (std::string const &items, unsigned int &switchStorage) {
+    for (char c : items) {
         changeSwitchStatus(c, OpType::REVERSAL, switchStorage);
     }
 }
 
-void plumbingController (unsigned int &switchStorage, const int* externalData) {
+bool plumbingController (unsigned int &switchStorage, const int* externalData) {
     const char PLUMBING = '3';
+    bool isStatusChanges = false;
     const int outsideTemperature = externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)];
 
     if (outsideTemperature < 0 && !getStorageItemStatus(PLUMBING, switchStorage)) {
         changeSwitchStatus(PLUMBING, OpType::ON, switchStorage);
+        isStatusChanges = true;
     } else if (outsideTemperature > 5 && getStorageItemStatus(PLUMBING, switchStorage)) {
         changeSwitchStatus(PLUMBING, OpType::OFF, switchStorage);
+        isStatusChanges = true;
     }
+
+    return isStatusChanges;
 }
 
-void heatingController (unsigned int &switchStorage, const int* externalData) {
+bool heatingController (unsigned int &switchStorage, const int* externalData) {
     const char HEATING = '4';
+    bool isStatusChanges = false;
     const int insideTemperature = externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)];
 
     if (insideTemperature < 22 && !getStorageItemStatus(HEATING, switchStorage)) {
         changeSwitchStatus(HEATING, OpType::ON, switchStorage);
+        isStatusChanges = true;
     } else if (insideTemperature > 25 && getStorageItemStatus(HEATING, switchStorage)) {
         changeSwitchStatus(HEATING, OpType::OFF, switchStorage);
+        isStatusChanges = true;
     }
+
+    return isStatusChanges;
 }
 
-void conditionerController (unsigned int &switchStorage, const int* externalData) {
+bool conditionerController (unsigned int &switchStorage, const int* externalData) {
     const char CONDITIONER = '5';
+    bool isStatusChanges = false;
     const int insideTemperature = externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)];
 
     if (insideTemperature > 30 && !getStorageItemStatus(CONDITIONER, switchStorage)) {
         changeSwitchStatus(CONDITIONER, OpType::ON, switchStorage);
+        isStatusChanges = true;
     } else if (insideTemperature < 25 && getStorageItemStatus(CONDITIONER, switchStorage)) {
         changeSwitchStatus(CONDITIONER, OpType::OFF, switchStorage);
+        isStatusChanges = true;
     }
+
+    return isStatusChanges;
 }
 
-void gardenLightingController (unsigned int &switchStorage, const int* externalData) {
+bool gardenLightingController (unsigned int &switchStorage, const int* externalData) {
     const char GARDEN_LIGHTING = '6';
+    bool isStatusChanges = false;
     const int isMotionDetection = externalData[static_cast<int>(ExternalData::MOTION_DETECTION)];
     const int time = externalData[static_cast<int>(ExternalData::TIME)];
 
     if (isMotionDetection && (time >= 16 || time <= 5) && !getStorageItemStatus(GARDEN_LIGHTING, switchStorage)) {
         changeSwitchStatus(GARDEN_LIGHTING, OpType::ON, switchStorage);
+        isStatusChanges = true;
     } else if (getStorageItemStatus(GARDEN_LIGHTING, switchStorage)) {
         changeSwitchStatus(GARDEN_LIGHTING, OpType::OFF, switchStorage);
+        isStatusChanges = true;
     }
+
+    return isStatusChanges;
 }
 
 int getRandomData (int from, int to) {
@@ -219,15 +255,6 @@ void setCurrentExternalData (int* externalData) {
 
 void printSwitchStorage (const unsigned int &switchStorage) {
     const auto SIZE = static_cast<size_t>(Switches::STORAGE_SIZE);
-    vector<string> switchNames = {
-            "all",
-            "inside light",
-            "outside light",
-            "plumbing",
-            "heating",
-            "conditioner",
-            "garden lighting"
-    };
 
     assert(SIZE == switchNames.size());
 
@@ -239,6 +266,11 @@ void printSwitchStorage (const unsigned int &switchStorage) {
                16, switchNames[currentSwitch].c_str(),
                getStorageItemStatus(static_cast<char>(currentSwitch + '0'), switchStorage) ? "ON " : "OFF");
     }
+}
+
+void printChangedSwitches (vector<string> &changedSwitchesInfo) {
+    cout << "List of changed states: " << endl;
+    for (auto &i : changedSwitchesInfo) cout << i << endl;
 }
 
 void printExternalData (const int* externalData) {
@@ -254,9 +286,15 @@ void printExternalData (const int* externalData) {
 
     cout << "------------------------------------\nData outside: \n";
     for (int i = 0; i < SIZE; ++i) {
-        printf("%-*s: %i\n",
-               30, externalDataNames[i].c_str(),
-               externalData[i]);
+        if (i == static_cast<int>(ExternalData::TIME)) {
+            printf("%-*s: %02i:00\n",
+                   30, externalDataNames[i].c_str(),
+                   externalData[i]);
+        } else {
+            printf("%-*s: %i\n",
+                   30, externalDataNames[i].c_str(),
+                   externalData[i]);
+        }
     }
 }
 
@@ -270,38 +308,52 @@ int main() {
     const char MAIN_SWITCH = '0';
     const char INSIDE_LIGHT = '1';
     const char OUTSIDE_LIGHT = '2';
+    const char PLUMBING = '3';
+    const char HEATING = '4';
+    const char CONDITIONER = '5';
+    const char GARDEN_LIGHTING = '6';
     unsigned int storage{0};
     int externalData[static_cast<int>(ExternalData::STORAGE_SIZE)] = {0};
-    string userChoice;
 
-    srand(time(NULL));
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-    //------hour 00:00
+    while (true) {
+        vector<string> changedSwitchesInfo;
+        string userChoice;
 
-    setCurrentExternalData(externalData);
+        setCurrentExternalData(externalData);
+        printReport(storage, externalData);
 
-    printReport(storage, externalData);
+       bool isMainSwitchOn = getStorageItemStatus(MAIN_SWITCH, storage);
+        if (getUserYesNo(!isMainSwitchOn ? "Smart home is off. Turn it on?" : "Smart home is on. Turn it off?")) {
+            changeSwitchStatus(MAIN_SWITCH, OpType::REVERSAL, storage);
+            changedSwitchesInfo.push_back(getStorageItemInfo(MAIN_SWITCH, storage));
+        }
 
-    if (!getStorageItemStatus(MAIN_SWITCH, storage)) {
-        if (getUserYesNo("Smart home is off. Turn it on?")) {
-            changeSwitchStatus(MAIN_SWITCH, OpType::ON, storage);
+        if (getStorageItemStatus(MAIN_SWITCH, storage)) {
+            if (getUserYesNo("Do you want to on/off devices?")) {
+                userChoice = getUserChoiceFrom("12");
+                autoReverseStorageStatus(userChoice, storage);
+            }
+
+            bool isPlumbingChanges = plumbingController(storage, externalData);
+            if (isPlumbingChanges) changedSwitchesInfo.push_back(getStorageItemInfo(PLUMBING, storage));
+
+            bool isHeatingChanges = heatingController(storage, externalData);
+            if (isHeatingChanges) changedSwitchesInfo.push_back(getStorageItemInfo(HEATING, storage));
+
+            bool isConditionerChanges = conditionerController(storage, externalData);
+            if (isConditionerChanges) changedSwitchesInfo.push_back(getStorageItemInfo(CONDITIONER, storage));
+        }
+
+        if (getStorageItemStatus(INSIDE_LIGHT, storage)) {
+            bool isGardenLightingChanges = gardenLightingController(storage, externalData);
+            if (isGardenLightingChanges) changedSwitchesInfo.push_back(getStorageItemInfo(GARDEN_LIGHTING, storage));
+        }
+
+        if (!changedSwitchesInfo.empty()) {
+            printChangedSwitches(changedSwitchesInfo);
+            printReport(storage, externalData);
         }
     }
-
-    if (getStorageItemStatus(MAIN_SWITCH, storage)) {
-        if (getUserYesNo("Do you want to on/off devices?")) {
-            userChoice = getUserChoiceFrom("12");
-            autoReverseStorageStatus(storage, userChoice);
-
-            plumbingController(storage, externalData);
-            heatingController(storage, externalData);
-            conditionerController(storage, externalData);
-        }
-    }
-
-    if (getStorageItemStatus(INSIDE_LIGHT, storage)) {
-        gardenLightingController(storage, externalData);
-    }
-
-    printReport(storage, externalData);
 }
