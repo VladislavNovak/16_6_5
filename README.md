@@ -250,6 +250,55 @@ int main() {
 }
 ```
 
+### Некоторые короткие операции:
+
+```C++
+// получить флаг указанного бита
+bool getStorageItemStatus(char item, const unsigned int &switchStorage) {
+    unsigned int cha = (item - '0');
+    unsigned int choice = (1 << cha);
+    return bool(switchStorage & choice);
+}
+```
+
+char to int:
+
+```C++
+char item = '2';
+unsigned int cha = (item - '0');
+```
+
+char to enum:
+
+```C++
+unsigned int store; // цель
+char item = '2';
+unsigned int cha = (item - '0');
+unsigned int choice = (1 << cha);
+
+store |= choice;  // ON
+store &= ~choice; // OFF
+store ^= choice;  // REVERSE
+```
+
+int to enum:
+
+```C++
+(ToggleType)(1 << currentNumber)
+```
+
+enum to int
+
+```C++
+int getTogglePosition(ToggleType const &item) {
+    int position = 0;
+    while (true) {
+        if (((int)(item) >> position) == 1) return position;
+        ++position;
+    }
+}
+```
+
 ### Интересные ссылки:
 
 [Поразрядные операции](https://metanit.com/cpp/tutorial/2.8.php)
