@@ -148,7 +148,7 @@ void changeToggle(ToggleType item, OpType operation, unsigned int &store) {
     }
 }
 
-// Получить флаг указанного бита
+// Получить состояние указанного бита
 bool hasToggleFlag(ToggleType item, const unsigned int &store) {
     return bool(store & static_cast<int>(item));
 }
@@ -160,83 +160,92 @@ string getToggleInfo(ToggleType item, const unsigned int &store) {
     return switchInfo;
 }
 
-bool plumbingController(unsigned int &switchStorage, const int* externalData) {
+bool plumbingController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::PLUMBING;
     const int outsideTemperature = externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)];
 
-    if (outsideTemperature < 0 && !hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::ON, switchStorage);
+    if (outsideTemperature < 0 && !hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::ON, store);
         isStatusChanges = true;
-    } else if (outsideTemperature > 5 && hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::OFF, switchStorage);
+    } else if (outsideTemperature > 5 && hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::OFF, store);
         isStatusChanges = true;
     }
 
     return isStatusChanges;
 }
 
-bool heatingController(unsigned int &switchStorage, const int* externalData) {
+bool heatingController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::HEATING;
     const int insideTemperature = externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)];
 
-    if (insideTemperature < 22 && !hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::ON, switchStorage);
+    if (insideTemperature < 22 && !hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::ON, store);
         isStatusChanges = true;
-    } else if (insideTemperature > 25 && hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::OFF, switchStorage);
+    } else if (insideTemperature > 25 && hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::OFF, store);
         isStatusChanges = true;
     }
 
     return isStatusChanges;
 }
 
-bool conditionerController(unsigned int &switchStorage, const int* externalData) {
+bool conditionerController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::CONDITIONER;
     const int insideTemperature = externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)];
 
-    if (insideTemperature > 30 && !hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::ON, switchStorage);
+    if (insideTemperature > 30 && !hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::ON, store);
         isStatusChanges = true;
-    } else if (insideTemperature < 25 && hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::OFF, switchStorage);
+    } else if (insideTemperature < 25 && hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::OFF, store);
         isStatusChanges = true;
     }
 
     return isStatusChanges;
 }
 
-bool gardenLightingController(unsigned int &switchStorage, const int* externalData) {
+bool gardenLightingController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::GARDEN_LIGHTING;
     const int isMotionDetection = externalData[static_cast<int>(ExternalData::MOTION_DETECTION)];
     const int time = externalData[static_cast<int>(ExternalData::TIME)];
 
-    if (isMotionDetection && (time >= 16 || time <= 5) && !hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::ON, switchStorage);
+    if (isMotionDetection && (time >= 16 || time <= 5) && !hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::ON, store);
         isStatusChanges = true;
-    } else if (hasToggleFlag(toggle, switchStorage)) {
-        changeToggle(toggle, OpType::OFF, switchStorage);
+    } else if (hasToggleFlag(toggle, store)) {
+        changeToggle(toggle, OpType::OFF, store);
         isStatusChanges = true;
     }
 
     return isStatusChanges;
 }
 
-int getRandomData(int from, int to) {
+int getRandomIntInRange(int from, int to) {
     return (from + std::rand() % (to - from + 1)); // NOLINT(cert-msc50-cpp)
 }
 
-void setCurrentExternalData(int *externalData) {
-    ++externalData[static_cast<int>(ExternalData::TIME)];
-    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = getRandomData(-10, 40);
-    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = getRandomData(-10, 40);
-    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = getRandomData(0, 1);
+// Если start !=1, возвращает следующее значение по отношению к previous
+int getCurrentTime(const int previous, int &start) {
+    int current = start < 0 ? (previous + 1): start;
+
+    // Сбрасываем start. Теперь будет действовать лишь previous
+    if (start != -1) start = -1;
+    return current > 23 ? 0 : current;
 }
 
-void printSwitchStorage(const unsigned int &switchStorage) {
+void setCurrentExternalData(int *externalData, int &startTime) {
+    externalData[static_cast<int>(ExternalData::TIME)] = getCurrentTime(externalData[static_cast<int>(ExternalData::TIME)], startTime);
+    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = getRandomIntInRange(-10, 40);
+    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = getRandomIntInRange(-10, 40);
+    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = getRandomIntInRange(0, 1);
+}
+
+void printSwitchStorage(const unsigned int &store) {
     const auto SIZE = static_cast<size_t>(ToggleType::STORAGE_SIZE);
 
     assert(SIZE == switchNames.size());
@@ -247,7 +256,7 @@ void printSwitchStorage(const unsigned int &switchStorage) {
         printf("(%i) status of %-*s: %s\n",
                currentToggleNumber,
                16, switchNames[currentToggleNumber].c_str(),
-               hasToggleFlag((ToggleType)(1 << currentToggleNumber), switchStorage) ? "ON " : "OFF");
+               hasToggleFlag((ToggleType)(1 << currentToggleNumber), store) ? "ON " : "OFF");
     }
 }
 
@@ -281,14 +290,15 @@ void printExternalData(const int *externalData) {
     }
 }
 
-void printReport(const unsigned int &switchStorage, const int *externalData) {
+void printReport(const unsigned int &store, const int *externalData) {
     printExternalData(externalData);
-    printSwitchStorage(switchStorage);
+    printSwitchStorage(store);
     cout << "------------------------------------\n";
 }
 
 int main() {
     unsigned int storage{0};
+    int startTime = getRandomIntInRange(0, 23);
     int externalData[static_cast<int>(ExternalData::STORAGE_SIZE)] = {0};
 
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
@@ -297,7 +307,8 @@ int main() {
         vector<string> changedTogglesInfo;
         string userChoice;
 
-        setCurrentExternalData(externalData);
+        setCurrentExternalData(externalData, startTime);
+
         printReport(storage, externalData);
 
         if (hasDialogYesNo(!hasToggleFlag(ToggleType::MAIN, storage)
@@ -320,7 +331,6 @@ int main() {
                     changedTogglesInfo.push_back(getToggleInfo(ToggleType::OUTSIDE_LIGHT, storage));
                 }
             }
-
 
             bool isPlumbingChanges = plumbingController(storage, externalData);
             if (isPlumbingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::PLUMBING, storage));
