@@ -307,6 +307,8 @@ int getTogglePosition(ToggleType const &item) {
 
 [C/C++ Работа с битами](https://volstr.ru/?p=36)
 
+[Работа с временем. Мой replit](https://replit.com/@VladNovak1/862#main.cpp)
+
 ### LIB. Использованные функции
 
 | Функция      | Ver | return | Смысл                                                       |

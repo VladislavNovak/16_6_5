@@ -11,7 +11,9 @@ using std::endl;
 using std::string;
 using std::vector;
 
-enum class ExternalData { TIME, OUTSIDE_TEMPERATURE, INSIDE_TEMPERATURE, MOTION_DETECTION, STORAGE_SIZE };
+enum class ExternalType { TIME, OUTSIDE_TEMPERATURE, INSIDE_TEMPERATURE, MOTION_DETECTION, COUNT };
+
+enum class InternalType { BRIGHTNESS, COUNT };
 
 // операции добавления/удаления/инверсии
 enum class OpType { ON, OFF, REVERSAL };
@@ -24,7 +26,7 @@ enum class ToggleType {
     HEATING = 16,
     CONDITIONER = 32,
     GARDEN_LIGHTING = 64,
-    STORAGE_SIZE = 7
+    COUNT = 7
 };
 
 vector<string> switchNames = {
@@ -148,8 +150,8 @@ void changeToggle(ToggleType item, OpType operation, unsigned int &store) {
 }
 
 void resetAllToggles(unsigned int &store) {
-    const auto STORAGE_SIZE = static_cast<size_t>(ToggleType::STORAGE_SIZE);
-    for (int i = 0; i < STORAGE_SIZE; ++i) {
+    const auto COUNT = static_cast<size_t>(ToggleType::COUNT);
+    for (int i = 0; i < COUNT; ++i) {
         changeToggle((ToggleType)(1 << i), OpType::OFF, store);
     }
 }
@@ -169,7 +171,7 @@ string getToggleInfo(ToggleType item, const unsigned int &store) {
 bool plumbingController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::PLUMBING;
-    const int outsideTemperature = externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)];
+    const int outsideTemperature = externalData[static_cast<int>(ExternalType::OUTSIDE_TEMPERATURE)];
 
     if (outsideTemperature < 0 && !hasToggleFlag(toggle, store)) {
         changeToggle(toggle, OpType::ON, store);
@@ -185,7 +187,7 @@ bool plumbingController(unsigned int &store, const int* externalData) {
 bool heatingController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::HEATING;
-    const int insideTemperature = externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)];
+    const int insideTemperature = externalData[static_cast<int>(ExternalType::INSIDE_TEMPERATURE)];
 
     if (insideTemperature < 22 && !hasToggleFlag(toggle, store)) {
         changeToggle(toggle, OpType::ON, store);
@@ -201,7 +203,7 @@ bool heatingController(unsigned int &store, const int* externalData) {
 bool conditionerController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::CONDITIONER;
-    const int insideTemperature = externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)];
+    const int insideTemperature = externalData[static_cast<int>(ExternalType::INSIDE_TEMPERATURE)];
 
     if (insideTemperature > 30 && !hasToggleFlag(toggle, store)) {
         changeToggle(toggle, OpType::ON, store);
@@ -217,8 +219,8 @@ bool conditionerController(unsigned int &store, const int* externalData) {
 bool gardenLightingController(unsigned int &store, const int* externalData) {
     bool isStatusChanges = false;
     ToggleType toggle = ToggleType::GARDEN_LIGHTING;
-    const int isMotionDetection = externalData[static_cast<int>(ExternalData::MOTION_DETECTION)];
-    const int time = externalData[static_cast<int>(ExternalData::TIME)];
+    const int isMotionDetection = externalData[static_cast<int>(ExternalType::MOTION_DETECTION)];
+    const int time = externalData[static_cast<int>(ExternalType::TIME)];
 
     if (isMotionDetection && (time >= 16 || time <= 5) && !hasToggleFlag(toggle, store)) {
         changeToggle(toggle, OpType::ON, store);
@@ -244,15 +246,63 @@ int getCurrentTime(const int previous, int &start) {
     return current > 23 ? 0 : current;
 }
 
-void setCurrentExternalData(int *externalData, int &startTime) {
-    externalData[static_cast<int>(ExternalData::TIME)] = getCurrentTime(externalData[static_cast<int>(ExternalData::TIME)], startTime);
-    externalData[static_cast<int>(ExternalData::OUTSIDE_TEMPERATURE)] = getRandomIntInRange(-10, 40);
-    externalData[static_cast<int>(ExternalData::INSIDE_TEMPERATURE)] = getRandomIntInRange(-10, 40);
-    externalData[static_cast<int>(ExternalData::MOTION_DETECTION)] = getRandomIntInRange(0, 1);
+bool setBrightness(int* internalData, const int* externalData) {
+    bool isStatusChanges = false;
+    const int MAX_BRIGHT = 5000;
+    const double REDUCTION = 11.5;
+    unsigned int brightness;
+    const int time = externalData[static_cast<int>(ExternalType::TIME)];
+
+    if (time >= 0 && time <= 16) brightness = 0;
+    else if (time == 17) brightness = 1;
+    else if (time == 18) brightness = 2;
+    else if (time == 19) brightness = 3;
+    else brightness = 4;
+
+    cout << "I: time:: " << time << endl;
+    cout << "I: flag:: " << brightness << endl;
+    int result = (int)(MAX_BRIGHT - (MAX_BRIGHT * REDUCTION / 100 * brightness));
+
+    if (internalData[static_cast<int>(InternalType::BRIGHTNESS)] != result) {
+        internalData[static_cast<int>(InternalType::BRIGHTNESS)] = result;
+        isStatusChanges = true;
+    }
+
+    return isStatusChanges;
+}
+
+bool setBrightness2(unsigned int &currentBrightness, const int* externalData) {
+    bool isStatusChanges = false;
+    const int MAX_BRIGHT = 5000;
+    const double REDUCTION = 11.5;
+    unsigned int brightness;
+    const int time = externalData[static_cast<int>(ExternalType::TIME)];
+
+    if (time >= 0 && time <= 16) brightness = 0;
+    else if (time == 17) brightness = 1;
+    else if (time == 18) brightness = 2;
+    else if (time == 19) brightness = 3;
+    else brightness = 4;
+
+    unsigned int result = (int)(MAX_BRIGHT - (MAX_BRIGHT * REDUCTION / 100 * brightness));
+
+    if (currentBrightness != result) {
+        currentBrightness = result;
+        isStatusChanges = true;
+    }
+
+    return isStatusChanges;
+}
+
+void setExternalData(int *externalData, int &startTime) {
+    externalData[static_cast<int>(ExternalType::TIME)] = getCurrentTime(externalData[static_cast<int>(ExternalType::TIME)], startTime);
+    externalData[static_cast<int>(ExternalType::OUTSIDE_TEMPERATURE)] = getRandomIntInRange(-10, 40);
+    externalData[static_cast<int>(ExternalType::INSIDE_TEMPERATURE)] = getRandomIntInRange(-10, 40);
+    externalData[static_cast<int>(ExternalType::MOTION_DETECTION)] = getRandomIntInRange(0, 1);
 }
 
 void printSwitchStorage(const unsigned int &store) {
-    const auto SIZE = static_cast<size_t>(ToggleType::STORAGE_SIZE);
+    const auto SIZE = static_cast<size_t>(ToggleType::COUNT);
 
     assert(SIZE == switchNames.size());
 
@@ -272,7 +322,7 @@ void printChangedTogglesInfo(vector<string> &changedTogglesInfo) {
 }
 
 void printExternalData(const int *externalData) {
-    const auto SIZE = static_cast<size_t>(ExternalData::STORAGE_SIZE);
+    const auto SIZE = static_cast<size_t>(ExternalType::COUNT);
     vector<string> externalDataNames = {
             "Time",
             "Outside temperature",
@@ -284,7 +334,7 @@ void printExternalData(const int *externalData) {
 
     cout << "------------------------------------\nData outside: \n";
     for (int i = 0; i < SIZE; ++i) {
-        if (i == static_cast<int>(ExternalData::TIME)) {
+        if (i == static_cast<int>(ExternalType::TIME)) {
             printf("%-*s: %02i:00\n",
                    30, externalDataNames[i].c_str(),
                    externalData[i]);
@@ -305,16 +355,19 @@ void printReport(const unsigned int &store, const int *externalData) {
 int main() {
     unsigned int togglesBox;
     resetAllToggles(togglesBox);
-    int startTime = getRandomIntInRange(0, 23);
-    int externalData[static_cast<int>(ExternalData::STORAGE_SIZE)] = {0};
+    int externalData[static_cast<int>(ExternalType::COUNT)] = {0};
+    int internalData[static_cast<int>(InternalType::COUNT)] = {0};
+    unsigned int currentBrightness = 0;
 
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+    int startTime = getRandomIntInRange(0, 23);
 
     while (true) {
         vector<string> changedTogglesInfo;
         string userChoice;
 
-        setCurrentExternalData(externalData, startTime);
+        setExternalData(externalData, startTime);
 
         printReport(togglesBox, externalData);
 
@@ -347,6 +400,13 @@ int main() {
 
             bool isConditionerChanges = conditionerController(togglesBox, externalData);
             if (isConditionerChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::CONDITIONER, togglesBox));
+
+            if (hasToggleFlag(ToggleType::INSIDE_LIGHT, togglesBox)) {
+                setBrightness(internalData, externalData);
+                // setBrightness(currentBrightness, externalData);
+                cout << "BRI:: " << internalData[static_cast<int>(InternalType::BRIGHTNESS)] << endl;
+                // cout << "BRI:: " << currentBrightness << endl;
+            }
 
             if (hasToggleFlag(ToggleType::OUTSIDE_LIGHT, togglesBox)) {
                 bool isGardenLightingChanges = gardenLightingController(togglesBox, externalData);
