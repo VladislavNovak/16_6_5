@@ -2,7 +2,6 @@
 #include <algorithm> // any_of
 #include <string>
 #include <cassert>
-#include <cctype>
 #include <vector>
 #include <cstdlib> // rand, srand
 #include <ctime> // time
@@ -37,21 +36,6 @@ vector<string> switchNames = {
         "conditioner",
         "garden lighting"
 };
-
-// Возвращает занимаемую позицию в enum
-int getTogglePosition(ToggleType const &item) {
-    int position = 0;
-    while (true) {
-        if (((int)(item) >> position) == 1) return position;
-        ++position;
-    }
-}
-
-// Преобразовывает текущий enum в номер позиции. Возвращает в виде типа char
-char getTogglePositionAsChar(ToggleType const &item) {
-    int position = getTogglePosition((item));
-    return static_cast<char>(position + '0');
-}
 
 // Получаем true если элемент `item` хоть раз встречается в диапазоне `range`
 bool isIncludes(const string &range, const char &item) {
@@ -137,6 +121,21 @@ string getUserChoiceFrom(const std::string &range) {
     return userInput;
 }
 
+// Возвращает занимаемую позицию в enum
+int getTogglePosition(ToggleType const &item) {
+    int position = 0;
+    while (true) {
+        if (((int)(item) >> position) == 1) return position;
+        ++position;
+    }
+}
+
+// Преобразовывает текущий enum в номер позиции. Возвращает в виде типа char
+char getTogglePositionAsChar(ToggleType const &item) {
+    int position = getTogglePosition((item));
+    return static_cast<char>(position + '0');
+}
+
 // Поменять флаг указанного бита по указанной операции
 void changeToggle(ToggleType item, OpType operation, unsigned int &store) {
     int choice = static_cast<int>(item);
@@ -145,6 +144,13 @@ void changeToggle(ToggleType item, OpType operation, unsigned int &store) {
         case (OpType::ON):       store |= choice; break;
         case (OpType::OFF):      store &= ~choice; break;
         case (OpType::REVERSAL): store ^= choice; break;
+    }
+}
+
+void resetAllToggles(unsigned int &store) {
+    const auto STORAGE_SIZE = static_cast<size_t>(ToggleType::STORAGE_SIZE);
+    for (int i = 0; i < STORAGE_SIZE; ++i) {
+        changeToggle((ToggleType)(1 << i), OpType::OFF, store);
     }
 }
 
@@ -297,7 +303,8 @@ void printReport(const unsigned int &store, const int *externalData) {
 }
 
 int main() {
-    unsigned int storage{0};
+    unsigned int togglesBox;
+    resetAllToggles(togglesBox);
     int startTime = getRandomIntInRange(0, 23);
     int externalData[static_cast<int>(ExternalData::STORAGE_SIZE)] = {0};
 
@@ -309,49 +316,49 @@ int main() {
 
         setCurrentExternalData(externalData, startTime);
 
-        printReport(storage, externalData);
+        printReport(togglesBox, externalData);
 
-        if (hasDialogYesNo(!hasToggleFlag(ToggleType::MAIN, storage)
+        if (hasDialogYesNo(!hasToggleFlag(ToggleType::MAIN, togglesBox)
                          ? "Smart home is off. Turn it on?"
                          : "Smart home is on. Turn it off?")) {
-            changeToggle(ToggleType::MAIN, OpType::REVERSAL, storage);
-            changedTogglesInfo.push_back(getToggleInfo(ToggleType::MAIN, storage));
+            changeToggle(ToggleType::MAIN, OpType::REVERSAL, togglesBox);
+            changedTogglesInfo.push_back(getToggleInfo(ToggleType::MAIN, togglesBox));
         }
 
-        if (hasToggleFlag(ToggleType::MAIN, storage)) {
+        if (hasToggleFlag(ToggleType::MAIN, togglesBox)) {
             if (hasDialogYesNo("Do you want to on/off devices?")) {
                 userChoice = getUserChoiceFrom("12");
 
                 if (isIncludes(userChoice, getTogglePositionAsChar(ToggleType::INSIDE_LIGHT))) {
-                    changeToggle(ToggleType::INSIDE_LIGHT, OpType::REVERSAL, storage);
-                    changedTogglesInfo.push_back(getToggleInfo(ToggleType::INSIDE_LIGHT, storage));
+                    changeToggle(ToggleType::INSIDE_LIGHT, OpType::REVERSAL, togglesBox);
+                    changedTogglesInfo.push_back(getToggleInfo(ToggleType::INSIDE_LIGHT, togglesBox));
                 }
                 if (isIncludes(userChoice, getTogglePositionAsChar(ToggleType::OUTSIDE_LIGHT))) {
-                    changeToggle(ToggleType::OUTSIDE_LIGHT, OpType::REVERSAL, storage);
-                    changedTogglesInfo.push_back(getToggleInfo(ToggleType::OUTSIDE_LIGHT, storage));
+                    changeToggle(ToggleType::OUTSIDE_LIGHT, OpType::REVERSAL, togglesBox);
+                    changedTogglesInfo.push_back(getToggleInfo(ToggleType::OUTSIDE_LIGHT, togglesBox));
                 }
             }
 
-            bool isPlumbingChanges = plumbingController(storage, externalData);
-            if (isPlumbingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::PLUMBING, storage));
+            bool isPlumbingChanges = plumbingController(togglesBox, externalData);
+            if (isPlumbingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::PLUMBING, togglesBox));
 
-            bool isHeatingChanges = heatingController(storage, externalData);
-            if (isHeatingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::HEATING, storage));
+            bool isHeatingChanges = heatingController(togglesBox, externalData);
+            if (isHeatingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::HEATING, togglesBox));
 
-            bool isConditionerChanges = conditionerController(storage, externalData);
-            if (isConditionerChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::CONDITIONER, storage));
+            bool isConditionerChanges = conditionerController(togglesBox, externalData);
+            if (isConditionerChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::CONDITIONER, togglesBox));
 
-            if (hasToggleFlag(ToggleType::OUTSIDE_LIGHT, storage)) {
-                bool isGardenLightingChanges = gardenLightingController(storage, externalData);
-                if (isGardenLightingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::GARDEN_LIGHTING, storage));
+            if (hasToggleFlag(ToggleType::OUTSIDE_LIGHT, togglesBox)) {
+                bool isGardenLightingChanges = gardenLightingController(togglesBox, externalData);
+                if (isGardenLightingChanges) changedTogglesInfo.push_back(getToggleInfo(ToggleType::GARDEN_LIGHTING, togglesBox));
             }
         } else {
-            // Выключить все переключатели
+            resetAllToggles(togglesBox);
         }
 
         if (!changedTogglesInfo.empty()) {
             printChangedTogglesInfo(changedTogglesInfo);
-            printReport(storage, externalData);
+            printReport(togglesBox, externalData);
         }
     }
 }
