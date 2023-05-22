@@ -69,46 +69,43 @@
   Конечно, свет есть лишь тогда, когда он включен: `INSIDE_LIGHT: on`
 
 
-| type   | automatic | toggles         | MAIN | insideTemperature            | outsideTemperature              | INSIDE_LIGHT | OUTSIDE_LIGHT | isMotionDetection | time              |
-|--------|-----------|-----------------|------|------------------------------|---------------------------------|--------------|---------------|-------------------|-------------------|
-| switch |           | MAIN            | on   |                              |                                 |              |               |                   |                   |
-| switch |           | INSIDE_LIGHT    | on   |                              |                                 |              |               |                   |                   |
-| switch |           | OUTSIDE_LIGHT   | on   |                              |                                 |              |               |                   |                   |
-| switch | automatic | PLUMBING        | on   |                              | on if (x < 0) && off if (x > 5) |              |               |                   |                   |
-| switch | automatic | HEATING         | on   | x < 22 && (off if x >= 25)   |                                 |              |               |                   |                   |
-| switch | automatic | CONDITIONER     | on   | (x > 30) && (off if x <= 25) |                                 |              |               |                   |                   |
-| switch | automatic | GARDEN_LIGHTING |      |                              |                                 |              | on            | is                | x >= 16 && x <= 5 |
-| range  | automatic | brightness      |      |                              |                                 | on           |               |                   | range             |
-
-Каждый час пользователь сообщает (Данные параметры вводятся разом в одну строку через пробел, а потом парсятся в переменные из строкового буфера stringstream):
-
-* температура внутри (`insideTemperature`), 
-* температура снаружи (`outsideTemperature`), 
-* есть ли движение снаружи (`isMotionDetection`), 
-
-Если произошла смена состояния, это отображается на табло.
-
-Если свет включен (`INSIDE_LIGHT`), должна отображаться температура света (`brightness`)
-
+| automatic | toggles         | MAIN | insideTemperature | outsideTemperature | INSIDE_LIGHT | OUTSIDE_LIGHT | isMotionDetection | time    |
+|-----------|-----------------|------|-------------------|--------------------|--------------|---------------|-------------------|---------|
+|           | MAIN            | on   |                   |                    |              |               |                   |         |
+|           | INSIDE_LIGHT    | on   |                   |                    |              |               |                   |         |
+|           | OUTSIDE_LIGHT   | on   |                   |                    |              |               |                   |         |
+| automatic | PLUMBING        | on   |                   | depends            |              |               |                   |         |
+| automatic | HEATING         | on   | depends           |                    |              |               |                   |         |
+| automatic | CONDITIONER     | on   | depends           |                    |              |               |                   |         |
+| automatic | GARDEN_LIGHTING |      |                   |                    |              | on            | is                | depends |
+| automatic | brightness      |      |                   |                    | on           |               |                   | range   |
 
 ## Битовые операции
 
-В самом простом случае не понадобится даже перечисление Switches. Оно лишь для наглядности.
+Создаем перечисление:
 
-В select заносим произвольное число (не более количества в Switches. В данном случае - не более 5);
+```C++
+enum class ToggleType {
+    MAIN = 1,
+    INSIDE_LIGHT = 2,
+    OUTSIDE_LIGHT = 4,
+    PLUMBING = 8,
+    HEATING = 16,
+    CONDITIONER = 32,
+    GARDEN_LIGHTING = 64,
+    COUNT = 7
+};
+```
+Последнее свойство - ToggleType::COUNT - указывает общее количество свойств в перечислении (исключая COUNT)
 
-Массив switchStates лучше делать с типом unsigned int.
+Переключатели помещаются в переменную с типом unsigned int:
 
-Создаем `flag`, который понадобится для битовых операций. Можно в него заносить данные из Switches. 
-Например, сейчас мы в select занесли 3. Соответственно, из Switches нужно взять третий элемент. 
-Это будет `Switches::PLUMBING`. 
-Однако, поскольку соотносить каждый раз введенное в select число и номер из перечисления достаточно трудоёмко
-(хотя можно это сделать через switch case), проще воспользоваться аналогом: `1 << select`. 
-
-Сдвиг влево на n, по сути, аналогичен умножению числа на 2n. Например, `7 << 3` даст в итоге `7 * 2*2*2 = 56`. 
-Но в данном коде важнее то, что `Switches::PLUMBING` и `(1 << select)` дают одинаковый результат. 
-
-Иначе говоря: 
+```C++
+unsigned int togglesBox;
+```
+Для того чтобы оперировать отдельными битами, нужно получить к ним доступ. Это делается посредством т.н. `сдвига влево`. 
+Как это работает? По сути, сдвиг влево на n аналогичен умножению числа на 2n. Например, `7 << 3` даст в итоге `7 * 2*2*2 = 56`. 
+Но в данном коде важнее то, что `Switches::PLUMBING` и `(1 << select)` дают одинаковый результат. Иначе говоря: 
 
 | [n] | enum                      | идентично | биты |
 |:---:|---------------------------|:---------:|-----:|
@@ -120,23 +117,13 @@
 |  5  | Switches::CONDITIONER     |  1 << 5   |   32 |
 |  6  | Switches::GARDEN_LIGHTING |  1 << 6   |   64 |
 
-
-и т.д., где изменяющаяся часть 0, 1, 2 соответствуют позиции в перечислении.
-
-Это позволяет манипулировать битом, устанавливая или снимая флаг (который, как мы установили ранее, равен 1 << select).
-
-Поскольку перечисление можно заменить конструкцией `1 << N` результат разумно будет поместить в переменную типа
-unsigned int. В таком случае пусть у нас будет два числа типа X и N: в X будет целевым числом, в котором будем менять биты. 
-А N это будет смещение битов. 
-
-Помним, что номера битов отсчитываются справа налево, начиная с нуля.
+Номера битов отсчитываются справа налево, начиная с нуля. 
 0 — это младший бит (справа), 7 — это старший  бит (слева). 
 Тогда, если мы хотим поменять несколько битов, то сделать это можно как:
 
 ```C++
 X = 1 << N0 | 1 << N2 | 1 << N3;
 ```
-
 Перечислю основные операции:
 
 |                          |                               |
@@ -206,50 +193,6 @@ int main() {
     cout << (store & (1 << 6)) << endl; // 0
 }
 ```
-
-Можно сделать интересный трюк, инвертируя все входящие номера битов. И, при этом, воспользоваться перечислением. 
-Просто для наглядности:
-
-```C++
-#include <iostream>
-using std::cout; using std::endl; using std::string; using std::vector;
-
-enum class Switches {
-    MAIN = 1,
-    INSIDE_LIGHT = 2,
-    OUTSIDE_LIGHT = 4,
-    PLUMBING = 8,
-    HEATING = 16,
-    CONDITIONER = 32,
-    GARDEN_LIGHTING = 64,
-};
-
-unsigned int getFlag (char c) {
-    // Можно использовать и более простой вариант:
-    // unsigned int cha = (c - '0');
-    // unsigned int flag = (1 << cha);
-    // return flag;
-    
-    switch (c) {
-        case ('0'): return static_cast<unsigned int>(Switches::MAIN);
-        case ('1'): return static_cast<unsigned int>(Switches::INSIDE_LIGHT);
-        case ('2'): return static_cast<unsigned int>(Switches::OUTSIDE_LIGHT);
-        case ('3'): return static_cast<unsigned int>(Switches::PLUMBING);
-        case ('4'): return static_cast<unsigned int>(Switches::HEATING);
-        case ('5'): return static_cast<unsigned int>(Switches::CONDITIONER);
-        case ('6'): return static_cast<unsigned int>(Switches::GARDEN_LIGHTING);
-        default: return static_cast<unsigned int>(Switches::MAIN);
-    }
-}
-
-int main() {
-    string userInputString = "245";
-    for (char c : userInputString) {
-        unsigned int store ^= getFlag(c);
-    }
-}
-```
-
 ### Некоторые короткие операции:
 
 ```C++
@@ -309,11 +252,27 @@ int getTogglePosition(ToggleType const &item) {
 
 [Работа с временем. Мой replit](https://replit.com/@VladNovak1/862#main.cpp)
 
-### LIB. Использованные функции
+### LIB + snippets:
 
-| Функция      | Ver | return | Смысл                                                       |
-|--------------|-----|--------|-------------------------------------------------------------|
-| isIncludes   | 1.0 | bool   | Получаем true если элемент хоть раз встречается в диапазоне |
-| getUserChar  | 1.0 | T      | Получаем символ в обозначенном диапазоне                    |
-| getUserInput | 1.0 | string | Получаем слово на основе getUserChar                        |
-| enumToString | 1.0 | string | Преобразовываем enum в соответствующий string               |
+| LIB                 | Ver | return | Смысл                                                            | last mod | prev mod |
+|---------------------|-----|--------|------------------------------------------------------------------|----------|----------|
+| isIncludes          | 1.0 | bool   | Получаем true если элемент хоть раз встречается в диапазоне      | 16_6_4   |          |
+| getUserChar         | 1.0 | T      | Диалог в пользователем. Получаем символ в обозначенном диапазоне | 16_6_4   |          |
+| getUserInput        | 2.0 | string | Диалог с пользователем. Получаем слово                           | 16_6_5   | 16_6_4   |
+| getRandomIntInRange | 1.0 | int    | RANDOM. Получить число в диапазоне                               | 16_6_5   |          |
+
+| snippets          | Ver | depends      | return | Смысл                                                          | last mod |
+|-------------------|-----|--------------|--------|----------------------------------------------------------------|----------|
+| getJoinRange      | 0.1 |              | string | Добавляет запятую между символами переданной строки            | 16_6_5   |
+| hasDialogYesNo    | 0.1 | isIncludes   | bool   | Диалог с пользователем. Позволяет вводить лишь да/нет          | 16_6_5   |
+| getUserChoiceFrom | 0.1 | getUserInput | string | Диалог с пользователем. Получаем слово с уникальными символами | 16_6_5   |
+
+| enum                    | Ver | depends           | return | Смысл                                          | last mod |
+|-------------------------|-----|-------------------|--------|------------------------------------------------|----------|
+| getTogglePosition       | 0.1 |                   | int    | Возвращает занимаемую позицию в enum           | 16_6_5   |
+| getTogglePositionAsChar | 0.1 | getTogglePosition | char   | Возвращает занимаемую позицию в enum           | 16_6_5   |
+| changeToggle            | 0.1 |                   |        | Меняет флаг указанного бита                    | 16_6_5   |
+| resetAllToggles         | 0.1 | changeToggle      |        | Сбрасывает все флаги                           | 16_6_5   |
+| hasToggleFlag           | 0.1 |                   | bool   | Получить состояние указанного бита             | 16_6_5   |
+| getToggleInfo           | 0.1 | hasToggleFlag     | string | Получить отчет о бите в строковом аналоге JSON | 16_6_5   |
+| enumToString            | 0.1 |                   | string | Преобразовывает enum в соответствующий name    | 16_6_4   |
